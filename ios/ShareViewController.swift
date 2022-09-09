@@ -13,6 +13,7 @@ import MobileCoreServices
 import UIKit
 import Social
 import RNShareMenu
+import os.log
 
 class ShareViewController: SLComposeServiceViewController {
   var hostAppId: String?
@@ -52,7 +53,8 @@ class ShareViewController: SLComposeServiceViewController {
 
     override func configurationItems() -> [Any]! {
         // To add configuration options via table cells at the bottom of the sheet, return an array of SLComposeSheetConfigurationItem here.
-        return []
+        didSelectPost()
+        return nil
     }
 
   func handlePost(_ items: [NSExtensionItem], extraData: [String:Any]? = nil) {
@@ -61,6 +63,8 @@ class ShareViewController: SLComposeServiceViewController {
         self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
         return
       }
+      NSLog("RCVC: handlePost 0")
+      
       guard let userDefaults = UserDefaults(suiteName: "group.\(hostAppId)") else {
         self.exit(withError: NO_APP_GROUP_ERROR)
         return
@@ -71,22 +75,39 @@ class ShareViewController: SLComposeServiceViewController {
       } else {
         self.removeExtraData()
       }
+      
+      NSLog("RCVC: handlePost 2")
 
       let semaphore = DispatchSemaphore(value: 0)
       var results: [Any] = []
+      NSLog("RCVC: handlePost 3")
+      NSLog("RCVC: %@",items)
+      
 
       for item in items {
+        NSLog("RCVC: handlePost 3.1 %@", item)
         guard let attachments = item.attachments else {
           self.cancelRequest()
           return
         }
+        NSLog("RCVC: handlePost 3.2 %@", attachments)
 
         for provider in attachments {
+          NSLog("RCVC: handlePost 3.3 %@", provider)
+
           if provider.isText {
+            NSLog("RCVC: handlePost 3.4 isText")
             self.storeText(withProvider: provider, semaphore)
           } else if provider.isURL {
+            NSLog("RCVC: handlePost 3.4 isURL")
             self.storeUrl(withProvider: provider, semaphore)
-          } else {
+          }
+          // else if provider.isFileURL {
+          //   NSLog("RCVC: handlePost 3.4 isFileURL")
+          //   self.storeUrl(withProvider: provider, semaphore)
+          // } 
+          else {
+            NSLog("RCVC: handlePost 3.4 isOther (file)")
             self.storeFile(withProvider: provider, semaphore)
           }
 
@@ -97,6 +118,7 @@ class ShareViewController: SLComposeServiceViewController {
       userDefaults.set(self.sharedItems,
                        forKey: USER_DEFAULTS_KEY)
       userDefaults.synchronize()
+      NSLog("RCVC: handlePost 5")
 
       self.openHostApp()
     }
@@ -155,44 +177,58 @@ class ShareViewController: SLComposeServiceViewController {
         return
       }
       
-      self.sharedItems.append([DATA_KEY: url.absoluteString, MIME_TYPE_KEY: "text/plain"])
+      self.sharedItems.append([DATA_KEY: url.absoluteString, MIME_TYPE_KEY: "unknown_type"])
       semaphore.signal()
     }
   }
   
   func storeFile(withProvider provider: NSItemProvider, _ semaphore: DispatchSemaphore) {
+    NSLog("RCVC: storeFile 1")
     provider.loadItem(forTypeIdentifier: kUTTypeData as String, options: nil) { (data, error) in
+
       guard (error == nil) else {
+        NSLog("RCVC: storeFile 2 %@", error.debugDescription)
         self.exit(withError: error.debugDescription)
         return
       }
       guard let url = data as? URL else {
+        NSLog("RCVC: storeFile 3 %@", COULD_NOT_FIND_IMG_ERROR)
         self.exit(withError: COULD_NOT_FIND_IMG_ERROR)
         return
       }
       guard let hostAppId = self.hostAppId else {
+        NSLog("RCVC: storeFile 4 %@", NO_INFO_PLIST_INDENTIFIER_ERROR)
         self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
         return
       }
+      NSLog("RCVC: storeFile 1")
       guard let groupFileManagerContainer = FileManager.default
               .containerURL(forSecurityApplicationGroupIdentifier: "group.\(hostAppId)")
       else {
+        NSLog("RCVC: storeFile 5 %@", NO_APP_GROUP_ERROR)
         self.exit(withError: NO_APP_GROUP_ERROR)
         return
       }
-      
+      NSLog("RCVC: storeFile url path %@", url.path)
+
       let mimeType = url.extractMimeType()
+      NSLog("RCVC: storeFile  mimeType %@", mimeType)
       let fileExtension = url.pathExtension
       let fileName = UUID().uuidString
       let filePath = groupFileManagerContainer
         .appendingPathComponent("\(fileName).\(fileExtension)")
-      
+      NSLog("RCVC: storeFile  fileName %@", fileName)
+
       guard self.moveFileToDisk(from: url, to: filePath) else {
+        NSLog("RCVC: storeFile  %@", COULD_NOT_SAVE_FILE_ERROR)
         self.exit(withError: COULD_NOT_SAVE_FILE_ERROR)
         return
       }
-      
+      NSLog("RCVC: storeFile7")
+
       self.sharedItems.append([DATA_KEY: filePath.absoluteString, MIME_TYPE_KEY: mimeType])
+      NSLog("RCVC: storeFile8")
+
       semaphore.signal()
     }
   }
@@ -217,22 +253,27 @@ class ShareViewController: SLComposeServiceViewController {
   }
   
   internal func openHostApp() {
+    NSLog("RCVC: openHostApp 0")
+
     guard let urlScheme = self.hostAppUrlScheme else {
       exit(withError: NO_INFO_PLIST_URL_SCHEME_ERROR)
       return
     }
-    
+    NSLog("RCVC: openHostApp 1")
+
     let url = URL(string: urlScheme)
     let selectorOpenURL = sel_registerName("openURL:")
     var responder: UIResponder? = self
-    
+    NSLog("RCVC: openHostApp 2")
+
     while responder != nil {
       if responder?.responds(to: selectorOpenURL) == true {
         responder?.perform(selectorOpenURL, with: url)
       }
       responder = responder!.next
     }
-    
+    NSLog("RCVC: openHostApp 3")
+
     completeRequest()
   }
   
