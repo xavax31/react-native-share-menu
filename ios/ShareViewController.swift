@@ -95,17 +95,13 @@ class ShareViewController: SLComposeServiceViewController {
           if provider.isText {
             NSLog("ShareViewController: handlePost isText")
             self.storeText(withProvider: provider, semaphore)
-          } else if provider.isURL {
-            NSLog("ShareViewController: handlePost isURL")
-            self.storeUrl(withProvider: provider, semaphore)
-          } else if provider.isFileURL {
-            NSLog("ShareViewController: handlePost isFileURL")
-            self.storeUrl(withProvider: provider, semaphore)
           } else if provider.isImage {
             NSLog("ShareViewController: handlePost isImage")
             self.storeImage(withProvider: provider, semaphore)
-          }
-          else {
+          } else if provider.isURL {
+            NSLog("ShareViewController: handlePost isURL")
+            self.storeLinkUrl(withProvider: provider, semaphore)
+          } else {
             NSLog("ShareViewController: handlePost isOther (file)")
             self.storeFile(withProvider: provider, semaphore)
           }
@@ -135,6 +131,22 @@ class ShareViewController: SLComposeServiceViewController {
     }
     userDefaults.set(data, forKey: USER_DEFAULTS_EXTRA_DATA_KEY)
     userDefaults.synchronize()
+  }
+
+  func storeLinkUrl(withProvider provider: NSItemProvider, _ semaphore: DispatchSemaphore) {
+    provider.loadItem(forTypeIdentifier: kUTTypeURL as String, options: nil) { (data, error) in
+      guard (error == nil) else {
+        self.exit(withError: error.debugDescription)
+        return
+      }
+      guard let url = data as? URL else {
+        self.exit(withError: COULD_NOT_FIND_URL_ERROR)
+        return
+      }
+      
+      self.sharedItems.append([DATA_KEY: url.absoluteString, MIME_TYPE_KEY: "text/plain"])
+      semaphore.signal()
+    }
   }
 
   func removeExtraData() {
