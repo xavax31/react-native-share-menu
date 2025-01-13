@@ -14,6 +14,7 @@ import UIKit
 import Social
 import RNShareMenu
 import os.log
+import MobileCoreServices
 
 @available(iOSApplicationExtension, unavailable)
 class ShareViewController: SLComposeServiceViewController {
@@ -67,7 +68,7 @@ class ShareViewController: SLComposeServiceViewController {
         self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
         return
       }
-      
+
       guard let userDefaults = UserDefaults(suiteName: "group.\(hostAppId)") else {
         self.exit(withError: NO_APP_GROUP_ERROR)
         return
@@ -78,7 +79,7 @@ class ShareViewController: SLComposeServiceViewController {
       } else {
         self.removeExtraData()
       }
-      
+
       let semaphore = DispatchSemaphore(value: 0)
       var results: [Any] = []
 
@@ -93,13 +94,13 @@ class ShareViewController: SLComposeServiceViewController {
         for provider in attachments {
           NSLog("ShareViewController: handlePost provider %@", provider)
 
-          if provider.isText {
+          if provider.hasItemConformingToTypeIdentifier(kUTTypeText as String) {
             NSLog("ShareViewController: handlePost isText")
             self.storeText(withProvider: provider, semaphore)
-          } else if provider.isImage {
+          } else if provider.hasItemConformingToTypeIdentifier(kUTTypeImage as String) {
             NSLog("ShareViewController: handlePost isImage")
             self.storeImage(withProvider: provider, semaphore)
-          } else if provider.isURL {
+          } else if provider.hasItemConformingToTypeIdentifier(kUTTypeURL as String) {
             NSLog("ShareViewController: handlePost isURL")
             self.storeLinkUrl(withProvider: provider, semaphore)
           } else {
