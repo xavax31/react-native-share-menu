@@ -15,6 +15,7 @@ import Social
 import RNShareMenu
 import os.log
 
+@available(iOSApplicationExtension, unavailable)
 class ShareViewController: SLComposeServiceViewController {
   var hostAppId: String?
   var hostAppUrlScheme: String?
@@ -168,12 +169,18 @@ class ShareViewController: SLComposeServiceViewController {
         self.exit(withError: error.debugDescription)
         return
       }
-      guard let text = data as? String else {
-        self.exit(withError: COULD_NOT_FIND_STRING_ERROR)
+      guard let text = data as? NSData else{
+        guard let text = data as? String else {
+          self.exit(withError: COULD_NOT_FIND_STRING_ERROR)
+          return
+        }
+        
+        self.sharedItems.append([DATA_KEY: text, MIME_TYPE_KEY: "text/plain"])
+        semaphore.signal()
         return
       }
-      
-      self.sharedItems.append([DATA_KEY: text, MIME_TYPE_KEY: "text/plain"])
+      let url = String(data: text as Data, encoding: .utf8)
+      self.sharedItems.append([DATA_KEY: url, MIME_TYPE_KEY: "vcard"])
       semaphore.signal()
     }
   }
@@ -422,22 +429,29 @@ class ShareViewController: SLComposeServiceViewController {
       return
     }
 
-    let url = URL(string: urlScheme)
-    let selectorOpenURL = sel_registerName("openURL:")
-    var responder: UIResponder? = self
-
-    while responder != nil {
-      if responder?.responds(to: selectorOpenURL) == true {
-        responder?.perform(selectorOpenURL, with: url)
-      }
-      responder = responder!.next
+    guard let url = URL(string: urlScheme) else {
+      exit(withError: NO_INFO_PLIST_URL_SCHEME_ERROR)
+      return
     }
-    NSLog("ShareViewController: openHostApp end")
+ 
+    UIApplication.shared.open(url, options: [:], completionHandler: completeRequest)
 
-    completeRequest()
+    // let url = URL(string: urlScheme)
+    // let selectorOpenURL = sel_registerName("openURL:")
+    // var responder: UIResponder? = self
+
+    // while responder != nil {
+    //   if responder?.responds(to: selectorOpenURL) == true {
+    //     responder?.perform(selectorOpenURL, with: url)
+    //   }
+    //   responder = responder!.next
+    // }
+    // NSLog("ShareViewController: openHostApp end")
+
+    // completeRequest()
   }
   
-  func completeRequest() {
+  func completeRequest(success: Bool) {
     // Inform the host that we're done, so it un-blocks its UI. Note: Alternatively you could call super's -didSelectPost, which will similarly complete the extension context.
     extensionContext!.completeRequest(returningItems: [], completionHandler: nil)
   }
