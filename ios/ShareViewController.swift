@@ -138,22 +138,6 @@ class ShareViewController: SLComposeServiceViewController {
     userDefaults.synchronize()
   }
 
-  func storeLinkUrl(withProvider provider: NSItemProvider, _ semaphore: DispatchSemaphore) {
-    provider.loadItem(forTypeIdentifier: kUTTypeURL as String, options: nil) { (data, error) in
-      guard (error == nil) else {
-        self.exit(withError: error.debugDescription)
-        return
-      }
-      guard let url = data as? URL else {
-        self.exit(withError: COULD_NOT_FIND_URL_ERROR)
-        return
-      }
-      
-      self.sharedItems.append([DATA_KEY: url.absoluteString, MIME_TYPE_KEY: "text/plain"])
-      semaphore.signal()
-    }
-  }
-
   func removeExtraData() {
     guard let hostAppId = self.hostAppId else {
       print("Error: \(NO_INFO_PLIST_INDENTIFIER_ERROR)")
