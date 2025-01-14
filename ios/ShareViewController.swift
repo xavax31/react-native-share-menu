@@ -103,7 +103,7 @@ class ShareViewController: SLComposeServiceViewController {
           } else if provider.isFileURL {
             NSLog("ShareViewController: handlePost isFileURL")
             self.storeUrl(withProvider: provider, semaphore)
-          } else if provider.isImage {
+          } else if provider.hasItemConformingToTypeIdentifier(kUTTypeImage as String) {
             NSLog("ShareViewController: handlePost isImage")
             self.storeImage(withProvider: provider, semaphore)
           } else {
