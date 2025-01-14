@@ -94,15 +94,18 @@ class ShareViewController: SLComposeServiceViewController {
         for provider in attachments {
           NSLog("ShareViewController: handlePost provider %@", provider)
 
-          if provider.hasItemConformingToTypeIdentifier(kUTTypeText as String) {
+         if provider.isText {
             NSLog("ShareViewController: handlePost isText")
             self.storeText(withProvider: provider, semaphore)
-          } else if provider.hasItemConformingToTypeIdentifier(kUTTypeImage as String) {
+          } else if provider.isURL {
+            NSLog("ShareViewController: handlePost isURL")
+            self.storeUrl(withProvider: provider, semaphore)
+          } else if provider.isFileURL {
+            NSLog("ShareViewController: handlePost isFileURL")
+            self.storeUrl(withProvider: provider, semaphore)
+          } else if provider.isImage {
             NSLog("ShareViewController: handlePost isImage")
             self.storeImage(withProvider: provider, semaphore)
-          } else if provider.hasItemConformingToTypeIdentifier(kUTTypeURL as String) {
-            NSLog("ShareViewController: handlePost isURL")
-            self.storeLinkUrl(withProvider: provider, semaphore)
           } else {
             NSLog("ShareViewController: handlePost isOther (file)")
             self.storeFile(withProvider: provider, semaphore)
