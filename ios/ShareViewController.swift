@@ -59,6 +59,22 @@ class ShareViewController: SLComposeServiceViewController {
       return nil
   }
 
+ func storeLinkUrl(withProvider provider: NSItemProvider, _ semaphore: DispatchSemaphore) {
+    provider.loadItem(forTypeIdentifier: kUTTypeURL as String, options: nil) { (data, error) in
+      guard (error == nil) else {
+        self.exit(withError: error.debugDescription)
+        return
+      }
+      guard let url = data as? URL else {
+        self.exit(withError: COULD_NOT_FIND_URL_ERROR)
+        return
+      }
+
+      self.sharedItems.append([DATA_KEY: url.absoluteString, MIME_TYPE_KEY: "text/plain"])
+      semaphore.signal()
+    }
+  }
+
   func handlePost(_ items: [NSExtensionItem], extraData: [String:Any]? = nil) {
     DispatchQueue.global().async {
 
@@ -99,7 +115,7 @@ class ShareViewController: SLComposeServiceViewController {
             self.storeText(withProvider: provider, semaphore)
           } else if provider.isURL {
             NSLog("ShareViewController: handlePost isURL")
-            self.storeUrl(withProvider: provider, semaphore)
+            self.storeLinkUrl(withProvider: provider, semaphore)
           } else if provider.isFileURL {
             NSLog("ShareViewController: handlePost isFileURL")
             self.storeUrl(withProvider: provider, semaphore)
