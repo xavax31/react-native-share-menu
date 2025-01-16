@@ -14,7 +14,9 @@ import UIKit
 import Social
 import RNShareMenu
 import os.log
+import MobileCoreServices
 
+@available(iOSApplicationExtension, unavailable)
 class ShareViewController: SLComposeServiceViewController {
   var hostAppId: String?
   var hostAppUrlScheme: String?
@@ -57,6 +59,22 @@ class ShareViewController: SLComposeServiceViewController {
       return nil
   }
 
+ func storeLinkUrl(withProvider provider: NSItemProvider, _ semaphore: DispatchSemaphore) {
+    provider.loadItem(forTypeIdentifier: kUTTypeURL as String, options: nil) { (data, error) in
+      guard (error == nil) else {
+        self.exit(withError: error.debugDescription)
+        return
+      }
+      guard let url = data as? URL else {
+        self.exit(withError: COULD_NOT_FIND_URL_ERROR)
+        return
+      }
+
+      self.sharedItems.append([DATA_KEY: url.absoluteString, MIME_TYPE_KEY: "text/plain"])
+      semaphore.signal()
+    }
+  }
+
   func handlePost(_ items: [NSExtensionItem], extraData: [String:Any]? = nil) {
     DispatchQueue.global().async {
 
@@ -66,7 +84,7 @@ class ShareViewController: SLComposeServiceViewController {
         self.exit(withError: NO_INFO_PLIST_INDENTIFIER_ERROR)
         return
       }
-      
+
       guard let userDefaults = UserDefaults(suiteName: "group.\(hostAppId)") else {
         self.exit(withError: NO_APP_GROUP_ERROR)
         return
@@ -77,7 +95,7 @@ class ShareViewController: SLComposeServiceViewController {
       } else {
         self.removeExtraData()
       }
-      
+
       let semaphore = DispatchSemaphore(value: 0)
       var results: [Any] = []
 
@@ -92,20 +110,19 @@ class ShareViewController: SLComposeServiceViewController {
         for provider in attachments {
           NSLog("ShareViewController: handlePost provider %@", provider)
 
-          if provider.isText {
+         if provider.isText {
             NSLog("ShareViewController: handlePost isText")
             self.storeText(withProvider: provider, semaphore)
           } else if provider.isURL {
             NSLog("ShareViewController: handlePost isURL")
-            self.storeUrl(withProvider: provider, semaphore)
+            self.storeLinkUrl(withProvider: provider, semaphore)
           } else if provider.isFileURL {
             NSLog("ShareViewController: handlePost isFileURL")
             self.storeUrl(withProvider: provider, semaphore)
-          } else if provider.isImage {
+          } else if provider.hasItemConformingToTypeIdentifier(kUTTypeImage as String) {
             NSLog("ShareViewController: handlePost isImage")
             self.storeImage(withProvider: provider, semaphore)
-          }
-          else {
+          } else {
             NSLog("ShareViewController: handlePost isOther (file)")
             self.storeFile(withProvider: provider, semaphore)
           }
@@ -156,12 +173,18 @@ class ShareViewController: SLComposeServiceViewController {
         self.exit(withError: error.debugDescription)
         return
       }
-      guard let text = data as? String else {
-        self.exit(withError: COULD_NOT_FIND_STRING_ERROR)
+      guard let text = data as? NSData else{
+        guard let text = data as? String else {
+          self.exit(withError: COULD_NOT_FIND_STRING_ERROR)
+          return
+        }
+        
+        self.sharedItems.append([DATA_KEY: text, MIME_TYPE_KEY: "text/plain"])
+        semaphore.signal()
         return
       }
-      
-      self.sharedItems.append([DATA_KEY: text, MIME_TYPE_KEY: "text/plain"])
+      let url = String(data: text as Data, encoding: .utf8)
+      self.sharedItems.append([DATA_KEY: url, MIME_TYPE_KEY: "vcard"])
       semaphore.signal()
     }
   }
@@ -410,22 +433,29 @@ class ShareViewController: SLComposeServiceViewController {
       return
     }
 
-    let url = URL(string: urlScheme)
-    let selectorOpenURL = sel_registerName("openURL:")
-    var responder: UIResponder? = self
-
-    while responder != nil {
-      if responder?.responds(to: selectorOpenURL) == true {
-        responder?.perform(selectorOpenURL, with: url)
-      }
-      responder = responder!.next
+    guard let url = URL(string: urlScheme) else {
+      exit(withError: NO_INFO_PLIST_URL_SCHEME_ERROR)
+      return
     }
-    NSLog("ShareViewController: openHostApp end")
+ 
+    UIApplication.shared.open(url, options: [:], completionHandler: completeRequest)
 
-    completeRequest()
+    // let url = URL(string: urlScheme)
+    // let selectorOpenURL = sel_registerName("openURL:")
+    // var responder: UIResponder? = self
+
+    // while responder != nil {
+    //   if responder?.responds(to: selectorOpenURL) == true {
+    //     responder?.perform(selectorOpenURL, with: url)
+    //   }
+    //   responder = responder!.next
+    // }
+    // NSLog("ShareViewController: openHostApp end")
+
+    // completeRequest()
   }
   
-  func completeRequest() {
+  func completeRequest(success: Bool) {
     // Inform the host that we're done, so it un-blocks its UI. Note: Alternatively you could call super's -didSelectPost, which will similarly complete the extension context.
     extensionContext!.completeRequest(returningItems: [], completionHandler: nil)
   }
